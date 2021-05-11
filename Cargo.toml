@@ -1,0 +1,45 @@
+[package]
+name = "netherite-algebra"
+version = "0.2.0"
+authors = [ "Tianchen Liu", "Weikeng Chen" ]
+description = "An implementation of ElGamal encryption and Shacham encryption"
+repository = "https://github.com/oblivious-file-sharing/netherite-algebra"
+include = ["Cargo.toml", "src", "README.md", "LICENSE"]
+license = "Apache-2.0"
+edition = "2018"
+
+################################# Dependencies ################################
+
+[dependencies]
+ark-ff = { version = "^0.2.0", default-features = false }
+ark-ec = { version = "^0.2.0", default-features = false }
+ark-serialize = { version = "^0.2.0", default-features = false, features = [ "derive" ] }
+ark-poly = { version = "^0.2.0", default-features = false }
+ark-std = { version = "^0.2.0", default-features = false }
+ark-relations = { version = "^0.2.0", default-features = false }
+ark-crypto-primitives = { version = "^0.2.0", default-features = false }
+ark-r1cs-std = { version = "^0.2.0", default-features = false, optional = true }
+
+tracing = { version = "0.1", default-features = false, features = [ "attributes" ], optional = true }
+derivative = { version = "2.0", features = ["use_core"], optional = true}
+
+rayon = { version = "1", optional = true }
+num-bigint = "0.4"
+
+[dev-dependencies]
+csv = { version = "1" }
+ark-bls12-381 = { version = "^0.2.0", default-features = false, features = ["curve"] }
+ark-algebra-test-templates = { version="^0.2.0", default-features = false }
+
+[profile.release]
+opt-level = 3
+panic = 'abort'
+
+[profile.dev]
+opt-level = 0
+panic = 'abort'
+
+[features]
+default = ["parallel"]
+std = ["ark-ff/std", "ark-ec/std", "ark-poly/std", "ark-relations/std", "ark-crypto-primitives/std", "ark-std/std" ]
+parallel = ["std", "ark-ff/parallel", "ark-poly/parallel", "ark-ec/parallel", "ark-crypto-primitives/parallel", "ark-std/parallel", "rayon"]
