@@ -104,7 +104,7 @@ impl<P: BnParameters> Encoder<P> {
             x
         };
 
-        let y = x * &x.square() + &self.b;
+        let _y = x * &x.square() + &self.b;
 
         // TODO: Compute the special character
         // TODO: Output the point
@@ -112,7 +112,7 @@ impl<P: BnParameters> Encoder<P> {
         unimplemented!()
     }
 
-    pub fn compute_character(idx: u8, val: P::Fp) -> i32 {
+    pub fn compute_character(_idx: u8, _val: P::Fp) -> i32 {
         // TODO:
         // depending on idx, compare the value
         // use this function: val.cmp()

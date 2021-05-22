@@ -31,7 +31,7 @@ pub struct ElGamalEncryption<G: ProjectiveCurve> {
 
 impl<G: ProjectiveCurve> ElGamalEncryption<G> {
     pub fn setup<R: ark_std::rand::Rng>(rng: &mut R) -> ElGamalPublicParameters<G> {
-        let g: G = G::rand(rng).into();
+        let g: G = G::rand(rng);
 
         ElGamalPublicParameters::<G> { g }
     }
@@ -50,7 +50,7 @@ impl<G: ProjectiveCurve> ElGamalEncryption<G> {
         let mut y = Vec::<G>::new();
 
         for i in 0..len {
-            y.push(pp.g.mul(scalar_x[i].into()).into());
+            y.push(pp.g.mul(scalar_x[i].into()));
         }
 
         let sk = ElGamalSecretKey::<G> { scalar_x };
@@ -87,7 +87,7 @@ impl<G: ProjectiveCurve> ElGamalEncryption<G> {
         let len = sk.scalar_x.len();
 
         for i in 0..len {
-            plaintext.push((ciphertext.e[i] - ciphertext.r.mul(sk.scalar_x[i].into())).into());
+            plaintext.push(ciphertext.e[i] - ciphertext.r.mul(sk.scalar_x[i].into()));
         }
 
         plaintext
@@ -104,11 +104,11 @@ impl<G: ProjectiveCurve> ElGamalEncryption<G> {
         let r_new = ciphertext.r + pk.pp.g.mul(scalar_r_new.into());
         let mut e_new = Vec::<G>::new();
         for i in 0..len {
-            e_new.push((ciphertext.e[i] + pk.y[i].mul(scalar_r_new.into())).into());
+            e_new.push(ciphertext.e[i] + pk.y[i].mul(scalar_r_new.into()));
         }
 
         ElGamalCiphertext::<G> {
-            r: r_new.into(),
+            r: r_new,
             e: e_new,
         }
     }

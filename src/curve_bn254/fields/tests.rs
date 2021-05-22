@@ -20,7 +20,7 @@ fn test_fr() {
     for _ in 0..ITERATIONS {
         let a: Fr = rng.gen();
         let b: Fr = rng.gen();
-        field_test(a, b.clone());
+        field_test(a, b);
         primefield_test::<Fr>();
         sqrt_field_test(b);
         let byte_size = a.serialized_size();
@@ -34,7 +34,7 @@ fn test_fq() {
     for _ in 0..ITERATIONS {
         let a: Fq = rng.gen();
         let b: Fq = rng.gen();
-        field_test(a.clone(), b);
+        field_test(a, b);
         primefield_test::<Fq>();
         sqrt_field_test(a);
         let byte_size = a.serialized_size();
@@ -50,7 +50,7 @@ fn test_fq2() {
     for _ in 0..ITERATIONS {
         let a: Fq2 = rng.gen();
         let b: Fq2 = rng.gen();
-        field_test(a.clone(), b);
+        field_test(a, b);
         sqrt_field_test(a);
     }
     frobenius_test::<Fq2, _>(Fq::characteristic(), 13);
@@ -387,7 +387,7 @@ fn test_fq_legendre() {
 #[test]
 fn test_fq2_ordering() {
     let mut a = Fq2::new(Fq::zero(), Fq::zero());
-    let mut b = a.clone();
+    let mut b = a;
 
     assert!(a.cmp(&b) == Ordering::Equal);
     b.c0.add_assign(&Fq::one());

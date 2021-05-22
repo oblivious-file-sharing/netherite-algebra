@@ -32,7 +32,7 @@ impl Fp2Parameters for Fq2Parameters {
 
     #[inline(always)]
     fn mul_fp_by_nonresidue(fe: &Self::Fp) -> Self::Fp {
-        -(*fe).clone()
+        -(*fe)
     }
 }
 

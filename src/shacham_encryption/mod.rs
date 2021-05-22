@@ -38,9 +38,9 @@ pub struct ShachamEncryption<G: ProjectiveCurve> {
 
 impl<G: ProjectiveCurve> ShachamEncryption<G> {
     pub fn setup<R: ark_std::rand::Rng>(rng: &mut R) -> ShachamPublicParameters<G> {
-        let u: G = G::rand(rng).into();
-        let v: G = G::rand(rng).into();
-        let w: G = G::rand(rng).into();
+        let u: G = G::rand(rng);
+        let v: G = G::rand(rng);
+        let w: G = G::rand(rng);
 
         ShachamPublicParameters::<G> { u, v, w }
     }
@@ -64,8 +64,8 @@ impl<G: ProjectiveCurve> ShachamEncryption<G> {
         let mut z = Vec::<G>::new();
 
         for i in 0..len {
-            y.push((pp.u.mul(scalar_x[i].into()) + pp.w.mul(scalar_z[i].into())).into());
-            z.push((pp.v.mul(scalar_y[i].into()) + pp.w.mul(scalar_z[i].into())).into());
+            y.push(pp.u.mul(scalar_x[i].into()) + pp.w.mul(scalar_z[i].into()));
+            z.push(pp.v.mul(scalar_y[i].into()) + pp.w.mul(scalar_z[i].into()));
         }
 
         let sk = ShachamSecretKey::<G> {
@@ -118,10 +118,10 @@ impl<G: ProjectiveCurve> ShachamEncryption<G> {
 
         for i in 0..len {
             plaintext.push(
-                (ciphertext.e[i]
+                ciphertext.e[i]
                     - ciphertext.r1.mul(sk.scalar_x[i].into())
                     - ciphertext.r2.mul(sk.scalar_y[i].into())
-                    - ciphertext.r3.mul(sk.scalar_z[i].into())),
+                    - ciphertext.r3.mul(sk.scalar_z[i].into()),
             );
         }
 
@@ -145,7 +145,7 @@ impl<G: ProjectiveCurve> ShachamEncryption<G> {
         let mut e_new = Vec::<G>::new();
 
         for i in 0..len {
-            e_new.push((ciphertext.e[i] + pk.y[i].mul(a_new.into()) + pk.z[i].mul(b_new.into())));
+            e_new.push(ciphertext.e[i] + pk.y[i].mul(a_new.into()) + pk.z[i].mul(b_new.into()));
         }
 
         ShachamCiphertext::<G> {
