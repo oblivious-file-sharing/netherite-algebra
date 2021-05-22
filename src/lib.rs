@@ -1,3 +1,5 @@
+#![allow(clippy::op_ref)]
+
 pub mod curve_bn254;
 pub mod curve_bn446;
 

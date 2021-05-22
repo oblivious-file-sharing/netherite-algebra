@@ -1,11 +1,12 @@
 use ark_ec::bn::{BnParameters, G1Affine};
 use ark_ec::SWModelParameters;
-use ark_ff::{Field, FpParameters, One, PrimeField, SquareRootField, Zero};
+use ark_ff::{BigInteger, Field, FpParameters, One, PrimeField, SquareRootField, Zero};
 use ark_std::ops::{Add, Div};
 use ark_std::rand::RngCore;
 use ark_std::{marker::PhantomData, ops::Neg, vec::Vec, UniformRand};
 use num_bigint::BigUint;
 
+#[derive(Default)]
 pub struct Encoder<P: BnParameters> {
     pub q: BigUint,
     pub minus_one: P::Fp,
@@ -28,7 +29,7 @@ impl<P: BnParameters> Encoder<P> {
         let minus_3: P::Fp = <P as BnParameters>::Fp::from(3u64).neg();
         let sqrt_minus_3 = minus_3.sqrt().unwrap();
 
-        let q: BigUint = <<P as BnParameters>::Fp as PrimeField>::Params::MODULUS.into();
+        let q: BigUint = <<P as BnParameters>::Fp as PrimeField>::Params::MODULUS.to_biguint();
         let q_minus_1_div_2 = P::Fp::from_repr(
             <<P as BnParameters>::Fp as PrimeField>::Params::MODULUS_MINUS_ONE_DIV_TWO,
         )
@@ -124,7 +125,7 @@ impl<P: BnParameters> Encoder<P> {
         // Compute the Legendre symbol via the law of quadratic reciprocity.
         assert!(!val.is_zero());
 
-        let mut p: BigUint = val.into();
+        let mut p: BigUint = val.to_biguint();
         let mut q = self.q.clone();
         let mut cur = 1;
 
