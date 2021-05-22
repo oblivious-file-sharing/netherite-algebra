@@ -1,4 +1,5 @@
 use ark_ec::ProjectiveCurve;
+use ark_ff::PrimeField;
 use ark_std::marker::PhantomData;
 use ark_std::vec::Vec;
 use ark_std::UniformRand;
@@ -50,7 +51,7 @@ impl<G: ProjectiveCurve> ElGamalEncryption<G> {
         let mut y = Vec::<G>::new();
 
         for i in 0..len {
-            y.push(pp.g.mul(scalar_x[i].into()).into());
+            y.push(pp.g.mul(&scalar_x[i].into_repr()).into());
         }
 
         let sk = ElGamalSecretKey::<G> { scalar_x };
@@ -72,12 +73,12 @@ impl<G: ProjectiveCurve> ElGamalEncryption<G> {
         let len = plaintext.len();
 
         let scalar_r = G::ScalarField::rand(rng);
-        let r = pk.pp.g.mul(scalar_r.into());
+        let r = pk.pp.g.mul(&scalar_r.into_repr());
 
         let mut e = Vec::<G>::new();
 
         for i in 0..len {
-            e.push(plaintext[i] + pk.y[i].mul(scalar_r.into()));
+            e.push(plaintext[i] + pk.y[i].mul(&scalar_r.into_repr()));
         }
         ElGamalCiphertext::<G> { r, e }
     }
@@ -87,7 +88,8 @@ impl<G: ProjectiveCurve> ElGamalEncryption<G> {
         let len = sk.scalar_x.len();
 
         for i in 0..len {
-            plaintext.push((ciphertext.e[i] - ciphertext.r.mul(sk.scalar_x[i].into())).into());
+            plaintext
+                .push((ciphertext.e[i] - ciphertext.r.mul(&sk.scalar_x[i].into_repr())).into());
         }
 
         plaintext
@@ -101,10 +103,10 @@ impl<G: ProjectiveCurve> ElGamalEncryption<G> {
         let len = ciphertext.e.len();
         let scalar_r_new = G::ScalarField::rand(rng);
 
-        let r_new = ciphertext.r + pk.pp.g.mul(scalar_r_new.into());
+        let r_new = ciphertext.r + pk.pp.g.mul(&scalar_r_new.into_repr());
         let mut e_new = Vec::<G>::new();
         for i in 0..len {
-            e_new.push((ciphertext.e[i] + pk.y[i].mul(scalar_r_new.into())).into());
+            e_new.push((ciphertext.e[i] + pk.y[i].mul(&scalar_r_new.into_repr())).into());
         }
 
         ElGamalCiphertext::<G> {

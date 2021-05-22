@@ -10,4 +10,5 @@ pub use fq2::*;
 pub use fq6::*;
 pub use fr::*;
 
+#[cfg(test)]
 mod tests;

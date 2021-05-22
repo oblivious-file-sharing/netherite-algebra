@@ -1,4 +1,5 @@
 use ark_ec::ProjectiveCurve;
+use ark_ff::PrimeField;
 use ark_std::marker::PhantomData;
 use ark_std::vec::Vec;
 use ark_std::UniformRand;
@@ -64,8 +65,12 @@ impl<G: ProjectiveCurve> ShachamEncryption<G> {
         let mut z = Vec::<G>::new();
 
         for i in 0..len {
-            y.push((pp.u.mul(scalar_x[i].into()) + pp.w.mul(scalar_z[i].into())).into());
-            z.push((pp.v.mul(scalar_y[i].into()) + pp.w.mul(scalar_z[i].into())).into());
+            y.push(
+                (pp.u.mul(&scalar_x[i].into_repr()) + pp.w.mul(&scalar_z[i].into_repr())).into(),
+            );
+            z.push(
+                (pp.v.mul(&scalar_y[i].into_repr()) + pp.w.mul(&scalar_z[i].into_repr())).into(),
+            );
         }
 
         let sk = ShachamSecretKey::<G> {
@@ -94,14 +99,16 @@ impl<G: ProjectiveCurve> ShachamEncryption<G> {
         let a = G::ScalarField::rand(rng);
         let b = G::ScalarField::rand(rng);
 
-        let r1 = pk.pp.u.mul(a.into());
-        let r2 = pk.pp.v.mul(b.into());
-        let r3 = pk.pp.w.mul((a + b).into());
+        let r1 = pk.pp.u.mul(&a.into_repr());
+        let r2 = pk.pp.v.mul(&b.into_repr());
+        let r3 = pk.pp.w.mul(&(a + b).into_repr());
 
         let mut e = Vec::<G>::new();
 
         for i in 0..len {
-            e.push((plaintext[i] + pk.y[i].mul(a.into()) + pk.z[i].mul(b.into())).into());
+            e.push(
+                (plaintext[i] + pk.y[i].mul(&a.into_repr()) + pk.z[i].mul(&b.into_repr())).into(),
+            );
         }
         ShachamCiphertext::<G> {
             r1: r1.into(),
@@ -119,9 +126,9 @@ impl<G: ProjectiveCurve> ShachamEncryption<G> {
         for i in 0..len {
             plaintext.push(
                 (ciphertext.e[i]
-                    - ciphertext.r1.mul(sk.scalar_x[i].into())
-                    - ciphertext.r2.mul(sk.scalar_y[i].into())
-                    - ciphertext.r3.mul(sk.scalar_z[i].into()))
+                    - ciphertext.r1.mul(&sk.scalar_x[i].into_repr())
+                    - ciphertext.r2.mul(&sk.scalar_y[i].into_repr())
+                    - ciphertext.r3.mul(&sk.scalar_z[i].into_repr()))
                 .into(),
             );
         }
@@ -139,15 +146,18 @@ impl<G: ProjectiveCurve> ShachamEncryption<G> {
         let a_new = G::ScalarField::rand(rng);
         let b_new = G::ScalarField::rand(rng);
 
-        let r1_new = ciphertext.r1 + pk.pp.u.mul(a_new.into());
-        let r2_new = ciphertext.r2 + pk.pp.v.mul(b_new.into());
-        let r3_new = ciphertext.r3 + pk.pp.w.mul((a_new + b_new).into());
+        let r1_new = ciphertext.r1 + pk.pp.u.mul(&a_new.into_repr());
+        let r2_new = ciphertext.r2 + pk.pp.v.mul(&b_new.into_repr());
+        let r3_new = ciphertext.r3 + pk.pp.w.mul(&(a_new + b_new).into_repr());
 
         let mut e_new = Vec::<G>::new();
 
         for i in 0..len {
             e_new.push(
-                (ciphertext.e[i] + pk.y[i].mul(a_new.into()) + pk.z[i].mul(b_new.into())).into(),
+                (ciphertext.e[i]
+                    + pk.y[i].mul(&a_new.into_repr())
+                    + pk.z[i].mul(&b_new.into_repr()))
+                .into(),
             );
         }
 
