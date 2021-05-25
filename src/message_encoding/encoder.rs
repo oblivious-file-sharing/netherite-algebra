@@ -126,7 +126,7 @@ impl<P: BnParameters> Encoder<P> {
         let y = self.compute_square_root(y) * c;
 
         //TODO: FORM THE X AND THE Y ONTO A G1 POINT
-        return G1Affine::new(x, y, false);
+        return G1Affine::new(x.clone(), y.clone(), false);
 
 
     }
