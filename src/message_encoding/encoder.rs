@@ -111,10 +111,22 @@ impl<P: BnParameters> Encoder<P> {
 
         // TODO: Compute the special character
         let character = self.compute_character(idx, val, w.inverse().unwrap());
-        // TODO: Output the point
-        let y = self.compute_square_root(y) * character;
+        let c: <P as BnParameters>::Fp =
+            if character == 1 {
+                <P as BnParameters>::Fp::one()
+            } else {
+                self.minus_one
+            };
+        // if character == 1 {
+        //     character = <P as BnParameters>::Fp::one();
+        // } else {
+        //     character = self.minus_one;
+        // }
+    // TODO: Output the point
+        let y = self.compute_square_root(y) * c;
 
         //TODO: FORM THE X AND THE Y ONTO A G1 POINT
+        return G1Affine::new(x, y, false);
 
 
     }
@@ -124,22 +136,21 @@ impl<P: BnParameters> Encoder<P> {
         // depending on idx, compare the value
         // use this function: val.cmp()
 
-        if _idx == 1 || _idx == 2 {
+        return if _idx == 1 || _idx == 2 {
             // CASE 1
             if _val.cmp(&self.q_minus_1_div_2).is_le() {
-                return 1;
+                1
             } else {
-                return -1;
+                -1
             }
         } else {
             // CASE 2
             let comp_number = u.neg() * self.sqrt_minus_3 * <P as BnParameters>::Fp::from(2u64).inverse().unwrap();
             if _val.cmp(&comp_number).is_le() {
-                return 1;
-            } else{
-                return -1;
+                1
+            } else {
+                -1
             }
-
         }
     }
 
