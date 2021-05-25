@@ -75,6 +75,9 @@ impl<P: BnParameters> Encoder<P> {
         // The following algorithm from [FT10] is equivalent to the original formulas for x_1, x_2, x_3
         // [FT10]: Pierre-Alain Fouque and Mehdi Tibouchi, "Indifferentiable Hashing to Barreto–Naehrig Curves", LATINCRYPT 2012.
 
+        // val is v on the paper
+        // w is 1/u; w.inverse() = u
+
         let w = self.sqrt_minus_3 * &val * &(self.b_plus_one + &val.square()).inverse().unwrap();
 
         let x1 = self.sqrt_minus_3_minus_1_div_2 - val * &w;
@@ -104,20 +107,40 @@ impl<P: BnParameters> Encoder<P> {
             x
         };
 
-        let _y = x * &x.square() + &self.b;
+        let y = x * &x.square() + &self.b;
 
         // TODO: Compute the special character
+        let character = self.compute_character(idx, val, w.inverse().unwrap());
         // TODO: Output the point
+        let y = self.compute_square_root(y) * character;
 
-        unimplemented!()
+        //TODO: FORM THE X AND THE Y ONTO A G1 POINT
+
+
     }
 
-    pub fn compute_character(_idx: u8, _val: P::Fp) -> i32 {
+    pub fn compute_character(&self, _idx: u8, _val: P::Fp, u: P::Fp) -> i32 {
         // TODO:
         // depending on idx, compare the value
         // use this function: val.cmp()
 
-        unimplemented!()
+        if _idx == 1 || _idx == 2 {
+            // CASE 1
+            if _val.cmp(&self.q_minus_1_div_2).is_le() {
+                return 1;
+            } else {
+                return -1;
+            }
+        } else {
+            // CASE 2
+            let comp_number = u.neg() * self.sqrt_minus_3 * <P as BnParameters>::Fp::from(2u64).inverse().unwrap();
+            if _val.cmp(&comp_number).is_le() {
+                return 1;
+            } else{
+                return -1;
+            }
+
+        }
     }
 
     #[inline]
