@@ -111,24 +111,21 @@ impl<P: BnParameters> Encoder<P> {
 
         // TODO: Compute the special character
         let character = self.compute_character(idx, val, w.inverse().unwrap());
-        let c: <P as BnParameters>::Fp =
-            if character == 1 {
-                <P as BnParameters>::Fp::one()
-            } else {
-                self.minus_one
-            };
+        let c: <P as BnParameters>::Fp = if character == 1 {
+            <P as BnParameters>::Fp::one()
+        } else {
+            self.minus_one
+        };
         // if character == 1 {
         //     character = <P as BnParameters>::Fp::one();
         // } else {
         //     character = self.minus_one;
         // }
-    // TODO: Output the point
+        // TODO: Output the point
         let y = self.compute_square_root(y) * c;
 
         //TODO: FORM THE X AND THE Y ONTO A G1 POINT
         return G1Affine::<P>::new(x.clone(), y, false);
-
-
     }
 
     pub fn compute_character(&self, _idx: u8, _val: P::Fp, u: P::Fp) -> i32 {
@@ -145,13 +142,15 @@ impl<P: BnParameters> Encoder<P> {
             }
         } else {
             // CASE 2
-            let comp_number = u.neg() * self.sqrt_minus_3 * <P as BnParameters>::Fp::from(2u64).inverse().unwrap();
+            let comp_number = u.neg()
+                * self.sqrt_minus_3
+                * <P as BnParameters>::Fp::from(2u64).inverse().unwrap();
             if _val.cmp(&comp_number).is_le() {
                 1
             } else {
                 -1
             }
-        }
+        };
     }
 
     #[inline]

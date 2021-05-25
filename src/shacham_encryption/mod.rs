@@ -103,12 +103,7 @@ impl<G: ProjectiveCurve> ShachamEncryption<G> {
         for i in 0..len {
             e.push(plaintext[i] + pk.y[i].mul(a.into()) + pk.z[i].mul(b.into()));
         }
-        ShachamCiphertext::<G> {
-            r1,
-            r2,
-            r3,
-            e,
-        }
+        ShachamCiphertext::<G> { r1, r2, r3, e }
     }
 
     pub fn decrypt(sk: &ShachamSecretKey<G>, ciphertext: &ShachamCiphertext<G>) -> Vec<G> {

@@ -107,10 +107,7 @@ impl<G: ProjectiveCurve> ElGamalEncryption<G> {
             e_new.push(ciphertext.e[i] + pk.y[i].mul(scalar_r_new.into()));
         }
 
-        ElGamalCiphertext::<G> {
-            r: r_new,
-            e: e_new,
-        }
+        ElGamalCiphertext::<G> { r: r_new, e: e_new }
     }
 }
 
