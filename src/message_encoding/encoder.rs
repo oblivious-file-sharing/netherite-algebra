@@ -1,6 +1,7 @@
 use ark_ec::bn::{BnParameters, G1Affine};
 use ark_ec::SWModelParameters;
-use ark_ff::{BigInteger, Field, FpParameters, One, PrimeField, SquareRootField, Zero};
+use ark_ff::{Field, FpParameters, One, PrimeField, SquareRootField, Zero};
+use ark_std::cmp::Ordering;
 use ark_std::ops::{Add, Div};
 use ark_std::rand::RngCore;
 use ark_std::{marker::PhantomData, ops::Neg, vec::Vec, UniformRand};
@@ -15,6 +16,7 @@ pub struct Encoder<P: BnParameters> {
     pub b: P::Fp,
     pub b_plus_one: P::Fp,
     pub sqrt_minus_3_minus_1_div_2: P::Fp,
+    pub minus_sqrt_minus_3_div_2: P::Fp,
 
     /// [u64] representation of (q + 1) / 4.
     /// Powering a quadratic residue by this, we can obtain one of the square root, for q == 3 (mod 4).
@@ -29,7 +31,7 @@ impl<P: BnParameters> Encoder<P> {
         let minus_3: P::Fp = <P as BnParameters>::Fp::from(3u64).neg();
         let sqrt_minus_3 = minus_3.sqrt().unwrap();
 
-        let q: BigUint = <<P as BnParameters>::Fp as PrimeField>::Params::MODULUS.to_biguint();
+        let q: BigUint = <<P as BnParameters>::Fp as PrimeField>::Params::MODULUS.into();
         let q_minus_1_div_2 = P::Fp::from_repr(
             <<P as BnParameters>::Fp as PrimeField>::Params::MODULUS_MINUS_ONE_DIV_TWO,
         )
@@ -42,6 +44,9 @@ impl<P: BnParameters> Encoder<P> {
 
         let sqrt_minus_3_minus_1_div_2 =
             (sqrt_minus_3 + &minus_one) * &<P as BnParameters>::Fp::from(2u64).inverse().unwrap();
+
+        let minus_sqrt_minus_3_div_2 =
+            sqrt_minus_3.neg() * <P as BnParameters>::Fp::from(2u64).inverse().unwrap();
 
         let square_root_pow = {
             let tmp: BigUint = q.clone().add(1u64).div(4u64);
@@ -66,6 +71,7 @@ impl<P: BnParameters> Encoder<P> {
             b,
             b_plus_one,
             sqrt_minus_3_minus_1_div_2,
+            minus_sqrt_minus_3_div_2,
             square_root_pow,
             phantom: PhantomData,
         }
@@ -109,48 +115,37 @@ impl<P: BnParameters> Encoder<P> {
 
         let y = x * &x.square() + &self.b;
 
-        // TODO: Compute the special character
+        // Compute the special character
         let character = self.compute_character(idx, val, w.inverse().unwrap());
-        let c: <P as BnParameters>::Fp = if character == 1 {
-            <P as BnParameters>::Fp::one()
-        } else {
-            self.minus_one
-        };
-        // if character == 1 {
-        //     character = <P as BnParameters>::Fp::one();
-        // } else {
-        //     character = self.minus_one;
-        // }
-        // TODO: Output the point
-        let y = self.compute_square_root(y) * c;
 
-        //TODO: FORM THE X AND THE Y ONTO A G1 POINT
-        return G1Affine::<P>::new(x.clone(), y, false);
+        // Output the point
+        let y = self.compute_square_root(y) * character;
+        let point = G1Affine::<P>::new(x.clone(), y, false);
+        assert!(point.is_on_curve());
+
+        point
     }
 
-    pub fn compute_character(&self, _idx: u8, _val: P::Fp, u: P::Fp) -> i32 {
-        // TODO:
-        // depending on idx, compare the value
-        // use this function: val.cmp()
+    pub fn compute_character(&self, idx: u8, val: P::Fp, u: P::Fp) -> P::Fp {
+        let one = <P as BnParameters>::Fp::one();
+        let minus_one = self.minus_one;
 
-        return if _idx == 1 || _idx == 2 {
+        if idx == 1 || idx == 2 {
             // CASE 1
-            if _val.cmp(&self.q_minus_1_div_2).is_le() {
-                1
+            if val.cmp(&self.q_minus_1_div_2) == Ordering::Less {
+                one
             } else {
-                -1
+                minus_one
             }
         } else {
             // CASE 2
-            let comp_number = u.neg()
-                * self.sqrt_minus_3
-                * <P as BnParameters>::Fp::from(2u64).inverse().unwrap();
-            if _val.cmp(&comp_number).is_le() {
-                1
+            let comp_number = u * self.minus_sqrt_minus_3_div_2;
+            if val.cmp(&comp_number) == Ordering::Less {
+                one
             } else {
-                -1
+                minus_one
             }
-        };
+        }
     }
 
     #[inline]
@@ -158,7 +153,7 @@ impl<P: BnParameters> Encoder<P> {
         // Compute the Legendre symbol via the law of quadratic reciprocity.
         assert!(!val.is_zero());
 
-        let mut p: BigUint = val.to_biguint();
+        let mut p: BigUint = val.into();
         let mut q = self.q.clone();
         let mut cur = 1;
 
