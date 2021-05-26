@@ -1,11 +1,13 @@
 use ark_ec::bn::{BnParameters, G1Affine};
 use ark_ec::SWModelParameters;
-use ark_ff::{Field, FpParameters, One, PrimeField, SquareRootField, Zero};
+use ark_ff::{Field, FpParameters, One, PrimeField, SquareRootField, Zero, LegendreSymbol};
 use ark_std::cmp::Ordering;
-use ark_std::ops::{Add, Div};
+use ark_std::ops::{Add, Div, Shr};
 use ark_std::rand::RngCore;
 use ark_std::{marker::PhantomData, ops::Neg, vec::Vec, UniformRand};
 use num_bigint::BigUint;
+use num_integer::Integer;
+use num_traits::ToPrimitive;
 
 #[derive(Default)]
 pub struct Encoder<P: BnParameters> {
@@ -17,6 +19,7 @@ pub struct Encoder<P: BnParameters> {
     pub b_plus_one: P::Fp,
     pub sqrt_minus_3_minus_1_div_2: P::Fp,
     pub minus_sqrt_minus_3_div_2: P::Fp,
+    pub legendre_2: i32,
 
     /// [u64] representation of (q + 1) / 4.
     /// Powering a quadratic residue by this, we can obtain one of the square root, for q == 3 (mod 4).
@@ -48,6 +51,12 @@ impl<P: BnParameters> Encoder<P> {
         let minus_sqrt_minus_3_div_2 =
             sqrt_minus_3.neg() * <P as BnParameters>::Fp::from(2u64).inverse().unwrap();
 
+        let legendre_2 = match <P as BnParameters>::Fp::from(2u64).legendre() {
+            LegendreSymbol::Zero => 0,
+            LegendreSymbol::QuadraticResidue => 1,
+            LegendreSymbol::QuadraticNonResidue => -1
+        };
+
         let square_root_pow = {
             let tmp: BigUint = q.clone().add(1u64).div(4u64);
             let bytes = tmp.to_bytes_le();
@@ -72,6 +81,7 @@ impl<P: BnParameters> Encoder<P> {
             b_plus_one,
             sqrt_minus_3_minus_1_div_2,
             minus_sqrt_minus_3_div_2,
+            legendre_2,
             square_root_pow,
             phantom: PhantomData,
         }
@@ -150,15 +160,20 @@ impl<P: BnParameters> Encoder<P> {
 
     #[inline]
     pub fn compute_legendre_symbol(&self, val: P::Fp) -> i32 {
-        // Compute the Legendre symbol via the law of quadratic reciprocity.
+        // Compute the Legendre symbol via the law of quadratic reciprocity (in the Jacobi case).
         assert!(!val.is_zero());
 
         let mut p: BigUint = val.into();
         let mut q = self.q.clone();
         let mut cur = 1;
 
+        while p.is_even() {
+            p = p.shr(1);
+            cur *= self.legendre_2;
+        }
+
         while !p.is_one() {
-            let new_p = q.clone() % p.clone();
+            let mut new_p = q.clone() % p.clone();
             let new_q = p.clone();
 
             let mut adjustment = -1;
@@ -173,6 +188,20 @@ impl<P: BnParameters> Encoder<P> {
 
             cur *= adjustment;
 
+            let legendre_2_cur = {
+                let tmp = (new_q.clone() % BigUint::from(8u64)).to_u8().unwrap();
+                if tmp == 1 || tmp == 7 {
+                    1
+                } else {
+                    -1
+                }
+            };
+
+            while new_p.is_even() {
+                new_p = new_p.shr(1);
+                cur *= legendre_2_cur;
+            }
+
             p = new_p;
             q = new_q;
         }
@@ -184,4 +213,50 @@ impl<P: BnParameters> Encoder<P> {
     pub fn compute_square_root(&self, val: P::Fp) -> P::Fp {
         val.pow(&self.square_root_pow)
     }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::curve_bn446::Parameters as Bn446Parameters;
+    use crate::message_encoding::encoder::Encoder;
+    use ark_ec::bn::BnParameters;
+    use ark_std::UniformRand;
+    use ark_ff::{SquareRootField, LegendreSymbol};
+
+    const REPETITIONS: u64 = 10;
+
+    #[test]
+    fn test_precomputation() {
+        let _encoder = Encoder::<Bn446Parameters>::new();
+
+        unimplemented!();
+    }
+
+    #[test]
+    fn test_square_root() {
+        unimplemented!();
+    }
+
+    #[test]
+    fn test_legendre_symbol() {
+        let mut rng = ark_std::test_rng();
+        let encoder = Encoder::<Bn446Parameters>::new();
+
+        for _ in 0..REPETITIONS {
+            let a = <Bn446Parameters as BnParameters>::Fp::rand(&mut rng);
+
+            let res_encoder = encoder.compute_legendre_symbol(a);
+
+            let res_standard = match a.legendre() {
+                LegendreSymbol::Zero => 0,
+                LegendreSymbol::QuadraticResidue => 1,
+                LegendreSymbol::QuadraticNonResidue => -1
+            };
+
+            assert_eq!(res_encoder, res_standard);
+        }
+    }
+
+    // TODO: see what other tests are needed
+    // TODO: fix the Legendre symbol, find an algorithm that is faster than simply doing exp
 }
