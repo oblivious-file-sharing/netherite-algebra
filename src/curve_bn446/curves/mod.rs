@@ -23,8 +23,6 @@ impl BnParameters for Parameters {
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, 0, 1,
     ];
-    /// `ate_loop_count` is positive.
-    const ATE_LOOP_COUNT_IS_NEGATIVE: bool = false;
 
     /// Point Q x coordinate
     /// Recall that xi = u + 16, this is xi ^ ((q - 1) / 3)

@@ -23,9 +23,6 @@ impl BnParameters for Parameters {
         0, 0, 0, 1, 1,
     ];
 
-    /// `ate_loop_count` is negative.
-    const ATE_LOOP_COUNT_IS_NEGATIVE: bool = true;
-
     /// Point Q x coordinate
     /// Recall that xi = u + 1, this is xi ^ ((q - 1) / 3)
     const TWIST_MUL_BY_Q_X: Fq2 = field_new!(
