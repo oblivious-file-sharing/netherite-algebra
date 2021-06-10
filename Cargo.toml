@@ -28,6 +28,8 @@ num-traits = "0.2.14"
 num-integer = "0.1.44"
 num-bigint = "0.4.0"
 
+blake2 = "0.9.1"
+
 [dev-dependencies]
 csv = { version = "1" }
 ark-bls12-381 = { version = "^0.3.0", default-features = false, features = ["curve"] }

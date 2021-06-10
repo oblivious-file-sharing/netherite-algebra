@@ -9,6 +9,8 @@ use num_bigint::BigUint;
 use num_integer::Integer;
 use num_traits::ToPrimitive;
 
+pub mod hybrid;
+
 pub type DecodeHint = u8;
 
 #[derive(Default)]
