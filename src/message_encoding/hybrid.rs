@@ -1,8 +1,8 @@
 use crate::message_encoding::{DecodeHint, Encoder};
 use ark_ec::bn::{BnParameters, G1Affine};
-use ark_ff::PrimeField;
+use ark_ff::{BigInteger, PrimeField};
 use ark_std::rand::RngCore;
-use blake2::digest::{VariableOutput, Update};
+use blake2::digest::{Update, VariableOutput};
 use blake2::VarBlake2s;
 use std::sync::atomic::AtomicBool;
 
@@ -58,19 +58,19 @@ impl<P: BnParameters> HybridEncoder<P> {
                 1 => {
                     hints_bool.push(false);
                     hints_bool.push(false);
-                },
+                }
                 2 => {
                     hints_bool.push(false);
                     hints_bool.push(true);
-                },
+                }
                 3 => {
                     hints_bool.push(true);
                     hints_bool.push(false);
-                },
+                }
                 4 => {
                     hints_bool.push(true);
                     hints_bool.push(true);
-                },
+                }
                 _ => panic!("Received hint that is not 1, 2, 3, or 4"),
             }
         }
@@ -87,8 +87,6 @@ impl<P: BnParameters> HybridEncoder<P> {
             hints_u8.push(num);
             cur_index += 8;
         }
-
-
 
         // convert the hint into 2 boolean values (true/false, 0/1) => Vec<bool>
         // write some code to convert Vec<bool> to Vec<u8>
@@ -113,10 +111,47 @@ impl<P: BnParameters> HybridEncoder<P> {
 
     pub fn decode(&self, points: &[G1Affine<P>]) -> Vec<u8> {
         // take the last point out
+        let last_point = points.last().copied().unwrap();
 
         // decode the last point
 
+        let decoded_last_point = self.encoder.decode_without_hints(last_point);
+
         // check the candidate numbers, see which one matches the pattern, this involves a check of the H(.)
+
+        let mut hints_unedited = Vec::new();
+
+        for candidate in decoded_last_point {
+            if let Some(field_element) = candidate {
+                let hints = field_element.into_repr().to_bytes_le();
+                let index = hints.len() - 10;
+                let hashed = hints.get(index..).unwrap();
+                let values = hints.get(..index).unwrap();
+                let mut hasher = VarBlake2s::new(10).unwrap();
+                hasher.update(values);
+                let mut res = Vec::new();
+                hasher.finalize_variable_reset(|r| res = r.to_vec());
+                if res == hashed {
+                    // THIS IS THE ONE
+                    hints_unedited = res;
+                }
+            }
+        }
+
+        assert!(!hints_unedited.is_empty());
+
+        let mut hints: Vec<u8> = Vec::new();
+
+        for num in hints_unedited {
+            let n1: u8 = ((num & 0b11000000) >> 6) + 1;
+            let n2: u8 = ((num & 0b00110000) >> 4) + 1;
+            let n3: u8 = ((num & 0b00001100) >> 2) + 1;
+            let n4: u8 = (num & 0b00000011) + 1;
+            hints.push(n1);
+            hints.push(n2);
+            hints.push(n3);
+            hints.push(n4);
+        }
 
         // get all the hints
 
@@ -125,8 +160,16 @@ impl<P: BnParameters> HybridEncoder<P> {
         // decode the first N-1 points
         // self.encoder.decode_with_hints(?, ?) =>
 
+        let mut ret: Vec<u8> = Vec::new();
+
+        for (i, point) in points.iter().enumerate() {
+            ret.extend(self.encoder.decode_with_hints(*point, hints[i]).into_repr().to_bytes_le())
+        }
+
         // arrange all the bytes together
 
-        unimplemented!()
+        ret
+
+        // unimplemented!()
     }
 }
