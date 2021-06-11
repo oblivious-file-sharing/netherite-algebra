@@ -2,8 +2,9 @@ use crate::message_encoding::{DecodeHint, Encoder};
 use ark_ec::bn::{BnParameters, G1Affine};
 use ark_ff::PrimeField;
 use ark_std::rand::RngCore;
-use blake2::digest::VariableOutput;
+use blake2::digest::{VariableOutput, Update};
 use blake2::VarBlake2s;
+use std::sync::atomic::AtomicBool;
 
 #[derive(Default)]
 pub struct HybridEncoder<P: BnParameters> {
@@ -50,19 +51,64 @@ impl<P: BnParameters> HybridEncoder<P> {
             hints.push(hint);
         }
 
+        let mut hints_bool: Vec<bool> = Vec::new();
+        let mut hints_u8: Vec<u8> = Vec::new();
+        for hint in hints {
+            match hint {
+                1 => {
+                    hints_bool.push(false);
+                    hints_bool.push(false);
+                },
+                2 => {
+                    hints_bool.push(false);
+                    hints_bool.push(true);
+                },
+                3 => {
+                    hints_bool.push(true);
+                    hints_bool.push(false);
+                },
+                4 => {
+                    hints_bool.push(true);
+                    hints_bool.push(true);
+                },
+                _ => panic!("Received hint that is not 1, 2, 3, or 4"),
+            }
+        }
+        let mut cur_index: usize = 8;
+        while cur_index <= hints_bool.len() {
+            let mut num: u8 = 0;
+            for i in (1..9).rev() {
+                num = num << 1;
+                match hints_bool[cur_index - i] {
+                    true => num += 1,
+                    false => (),
+                }
+            }
+            hints_u8.push(num);
+            cur_index += 8;
+        }
+
+
+
         // convert the hint into 2 boolean values (true/false, 0/1) => Vec<bool>
         // write some code to convert Vec<bool> to Vec<u8>
         // compute H(hints) and take the first 80-bit, which would be 10 bytes
         // => make them into a field element
         let mut hasher = VarBlake2s::new(10).unwrap();
+        hasher.update(hints_u8.clone());
         // use hasher.update to put data into the hasher
+        let mut res = Vec::new();
+        hasher.finalize_variable_reset(|r| res = r.to_vec());
         // use hasher.finalize_variable_reset to obtain the hash value and reset the hasher
-
+        hints_u8.extend(res.clone());
         // encode the hints || H(hints)
+        let field_element = P::Fp::from_le_bytes_mod_order(&hints_u8);
+        let (point, hint) = self.encoder.encode(field_element, rng);
 
         // output
-
-        unimplemented!()
+        points.push(point);
+        points
+        // unimplemented!()
     }
 
     pub fn decode(&self, points: &[G1Affine<P>]) -> Vec<u8> {
