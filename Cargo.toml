@@ -21,6 +21,7 @@ ark-crypto-primitives = { version = "^0.3.0", default-features = false }
 ark-r1cs-std = { version = "^0.3.0", default-features = false, optional = true }
 
 gmp-mpfr-sys = { version = "1.4", default-features = false }
+subtle = "2.4"
 
 tracing = { version = "0.1", default-features = false, features = [ "attributes" ], optional = true }
 derivative = { version = "2.0", features = ["use_core"], optional = true}

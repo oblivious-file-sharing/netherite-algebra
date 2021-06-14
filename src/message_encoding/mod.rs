@@ -3,11 +3,12 @@ use ark_ec::SWModelParameters;
 use ark_ff::{Field, FpParameters, LegendreSymbol, One, PrimeField, SquareRootField, Zero};
 use ark_std::cmp::Ordering;
 use ark_std::mem::MaybeUninit;
-use ark_std::ops::{Add, Div};
+use ark_std::ops::{Add, Div, BitAnd};
 use ark_std::rand::RngCore;
 use ark_std::{marker::PhantomData, ops::Neg, vec::Vec, UniformRand};
 use gmp_mpfr_sys::gmp;
 use num_bigint::BigUint;
+use subtle::{ConstantTimeEq, ConditionallySelectable};
 
 pub mod hybrid;
 
@@ -186,9 +187,7 @@ impl<P: BnParameters> Encoder<P> {
 
         let decode_hint = {
             let mut x = 1;
-
-            let mut sel = idx.eq(&2u8) as u8;
-            x = x * (1 - sel) + 2 * sel;
+            x.conditional_assign(&2u8, idx.ct_eq(&2u8));
 
             let sgn_u_cur = if u.cmp(&self.q_minus_1_div_2) == Ordering::Less {
                 1i8
@@ -196,13 +195,8 @@ impl<P: BnParameters> Encoder<P> {
                 -1i8
             };
 
-            sel = idx.eq(&3u8) as u8;
-            sel *= sgn_u_cur.eq(&1i8) as u8;
-            x = x * (1 - sel) + 3 * sel;
-
-            sel = idx.eq(&3u8) as u8;
-            sel *= sgn_u_cur.eq(&-1i8) as u8;
-            x = x * (1 - sel) + 4 * sel;
+            x.conditional_assign(&3u8, idx.ct_eq(&3u8).bitand(sgn_u_cur.ct_eq(&1i8)));
+            x.conditional_assign(&4u8, idx.ct_eq(&3u8).bitand(sgn_u_cur.ct_eq(&-1i8)));
 
             x
         };
@@ -413,7 +407,7 @@ mod test {
         // q = 102211695604069718983520304652693874995639508460729604902280098199792736381528662976886082950231100101353700265360419596271313339023463
         unsafe {
             let mut expected_q = MaybeUninit::uninit();
-            gmp::mpz_init_set_str(expected_q.as_mut_ptr(), "102211695604069718983520304652693874995639508460729604902280098199792736381528662976886082950231100101353700265360419596271313339023463".as_ptr() as *const i8, 10);
+            gmp::mpz_init_set_str(expected_q.as_mut_ptr(), "102211695604069718983520304652693874995639508460729604902280098199792736381528662976886082950231100101353700265360419596271313339023463\x00".as_ptr() as *const i8, 10);
             let mut expected_q = expected_q.assume_init();
 
             assert_eq!(gmp::mpz_cmp(&expected_q, &encoder.q), 0);
