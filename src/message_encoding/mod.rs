@@ -2,20 +2,19 @@ use ark_ec::bn::{BnParameters, G1Affine};
 use ark_ec::SWModelParameters;
 use ark_ff::{Field, FpParameters, LegendreSymbol, One, PrimeField, SquareRootField, Zero};
 use ark_std::cmp::Ordering;
-use ark_std::ops::{Add, Div, Shr};
+use ark_std::mem::MaybeUninit;
+use ark_std::ops::{Add, Div};
 use ark_std::rand::RngCore;
 use ark_std::{marker::PhantomData, ops::Neg, vec::Vec, UniformRand};
+use gmp_mpfr_sys::gmp;
 use num_bigint::BigUint;
-use num_integer::Integer;
-use num_traits::ToPrimitive;
 
 pub mod hybrid;
 
 pub type DecodeHint = u8;
 
-#[derive(Default)]
 pub struct Encoder<P: BnParameters> {
-    pub q: BigUint,
+    pub q: gmp::mpz_t,
 
     pub b: P::Fp,
     pub b_plus_one: P::Fp,
@@ -42,9 +41,25 @@ pub struct Encoder<P: BnParameters> {
     pub phantom: PhantomData<P>,
 }
 
+unsafe impl<P: BnParameters> Sync for Encoder<P> {}
+
 impl<P: BnParameters> Encoder<P> {
     pub fn new() -> Self {
-        let q: BigUint = <<P as BnParameters>::Fp as PrimeField>::Params::MODULUS.into();
+        let q = unsafe {
+            let mut q = MaybeUninit::uninit();
+            gmp::mpz_init_set_ui(q.as_mut_ptr(), 0u64);
+
+            let mut q = q.assume_init();
+
+            let repr = <<P as BnParameters>::Fp as PrimeField>::Params::MODULUS;
+            let limbs: &[u64] = AsRef::<[u64]>::as_ref(&repr);
+            for limb in limbs.iter().rev() {
+                gmp::mpz_mul_2exp(&mut q, &q, 64);
+                gmp::mpz_add_ui(&mut q, &q, *limb);
+            }
+
+            q
+        };
 
         let b = P::G1Parameters::COEFF_B;
         let b_plus_one = b + &<P as BnParameters>::Fp::one();
@@ -71,7 +86,10 @@ impl<P: BnParameters> Encoder<P> {
         .unwrap();
 
         let square_root_pow = {
-            let tmp: BigUint = q.clone().add(1u64).div(4u64);
+            let tmp: BigUint = <<P as BnParameters>::Fp as PrimeField>::Params::MODULUS
+                .into()
+                .add(1u64)
+                .div(4u64);
             let bytes = tmp.to_bytes_le();
 
             let mut limbs = Vec::new();
@@ -218,50 +236,23 @@ impl<P: BnParameters> Encoder<P> {
         // Compute the Legendre symbol via the law of quadratic reciprocity (in the Jacobi case).
         assert!(!val.is_zero());
 
-        let mut p: BigUint = val.into();
-        let mut q = self.q.clone();
-        let mut cur = 1;
+        let p = unsafe {
+            let mut p = MaybeUninit::uninit();
+            gmp::mpz_init_set_ui(p.as_mut_ptr(), 0u64);
 
-        while p.is_even() {
-            p = p.shr(1);
-            cur *= self.legendre_2;
-        }
+            let mut p = p.assume_init();
 
-        while !p.is_one() {
-            let mut new_p = q.clone() % p.clone();
-            let new_q = p.clone();
-
-            let mut adjustment = -1;
-
-            if (p.clone() % BigUint::from(4u64)).is_one() {
-                adjustment = 1;
+            let repr = val.into_repr();
+            let limbs: &[u64] = AsRef::<[u64]>::as_ref(&repr);
+            for limb in limbs.iter().rev() {
+                gmp::mpz_mul_2exp(&mut p, &p, 64);
+                gmp::mpz_add_ui(&mut p, &p, *limb);
             }
 
-            if (q.clone() % BigUint::from(4u64)).is_one() {
-                adjustment = 1;
-            }
+            p
+        };
 
-            cur *= adjustment;
-
-            let legendre_2_cur = {
-                let tmp = (new_q.clone() % BigUint::from(8u64)).to_u8().unwrap();
-                if tmp == 1 || tmp == 7 {
-                    1
-                } else {
-                    -1
-                }
-            };
-
-            while new_p.is_even() {
-                new_p = new_p.shr(1);
-                cur *= legendre_2_cur;
-            }
-
-            p = new_p;
-            q = new_q;
-        }
-
-        cur
+        unsafe { gmp::mpz_jacobi(&p, &self.q) }
     }
 
     #[inline]
@@ -394,15 +385,23 @@ impl<P: BnParameters> Encoder<P> {
     }
 }
 
+impl<P: BnParameters> Drop for Encoder<P> {
+    fn drop(&mut self) {
+        unsafe { gmp::mpz_clear(&mut self.q) }
+    }
+}
+
 #[cfg(test)]
 mod test {
     use crate::curve_bn446::Parameters as Bn446Parameters;
     use crate::message_encoding::Encoder;
     use ark_ec::bn::BnParameters;
     use ark_ff::{LegendreSymbol, SquareRootField, Zero};
+    use ark_std::mem::MaybeUninit;
     use ark_std::ops::ShlAssign;
     use ark_std::str::FromStr;
     use ark_std::UniformRand;
+    use gmp_mpfr_sys::gmp;
     use num_bigint::BigUint;
 
     const REPETITIONS: u64 = 100;
@@ -412,7 +411,15 @@ mod test {
         let encoder = Encoder::<Bn446Parameters>::new();
 
         // q = 102211695604069718983520304652693874995639508460729604902280098199792736381528662976886082950231100101353700265360419596271313339023463
-        assert_eq!(encoder.q, BigUint::from_str("102211695604069718983520304652693874995639508460729604902280098199792736381528662976886082950231100101353700265360419596271313339023463").unwrap());
+        unsafe {
+            let mut expected_q = MaybeUninit::uninit();
+            gmp::mpz_init_set_str(expected_q.as_mut_ptr(), "102211695604069718983520304652693874995639508460729604902280098199792736381528662976886082950231100101353700265360419596271313339023463".as_ptr() as *const i8, 10);
+            let mut expected_q = expected_q.assume_init();
+
+            assert_eq!(gmp::mpz_cmp(&expected_q, &encoder.q), 0);
+
+            gmp::mpz_clear(&mut expected_q);
+        }
 
         // b
         assert_eq!(BigUint::from_str("257").unwrap(), encoder.b.into());

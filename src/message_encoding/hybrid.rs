@@ -5,6 +5,14 @@ use ark_std::rand::RngCore;
 use blake2::digest::{Update, VariableOutput};
 use blake2::VarBlake2s;
 
+#[cfg(feature = "parallel")]
+use ark_std::{cfg_iter, cfg_iter_mut};
+
+#[cfg(feature = "parallel")]
+use rayon::iter::{
+    IndexedParallelIterator, IntoParallelRefIterator, IntoParallelRefMutIterator, ParallelIterator,
+};
+
 // The length of the hash value in the hybrid embedding,
 // 80 is chosen heuristically treating the VarBlake2 as a random oracle.
 //
@@ -12,8 +20,7 @@ use blake2::VarBlake2s;
 // we are using the pseudorandomness of the hash function, treated as the random oracle.
 const HASH_LEN: usize = 80;
 
-#[derive(Default)]
-pub struct HybridEncoder<P: BnParameters> {
+pub struct HybridEncoder<P: BnParameters + Sync> {
     // The number of bytes for an embed-direct point
     pub num_bytes_per_point: usize,
     // The number of data points in a group
@@ -21,8 +28,10 @@ pub struct HybridEncoder<P: BnParameters> {
     pub encoder: Encoder<P>,
 }
 
-impl<P: BnParameters> HybridEncoder<P> {
-    fn new() -> Self {
+unsafe impl<P: BnParameters + Sync> Sync for HybridEncoder<P> {}
+
+impl<P: BnParameters + Sync> HybridEncoder<P> {
+    pub unsafe fn new() -> Self {
         let capacity = P::Fp::size_in_bits() - 1;
         let num_bytes_per_point = capacity >> 3; // divide the capacity directly by 8
 
@@ -49,14 +58,40 @@ impl<P: BnParameters> HybridEncoder<P> {
         let mut points = Vec::<G1Affine<P>>::new();
         let mut hints = Vec::<DecodeHint>::new();
 
-        for i in 0..self.num_data_points {
-            // convert the bytes to a field element using P::Fp::from_le_bytes_mod_order
-            let field_element = P::Fp::from_le_bytes_mod_order(
-                &bytes[i * self.num_bytes_per_point..(i + 1) * self.num_bytes_per_point],
-            );
-            let (point, hint) = self.encoder.encode(field_element, rng);
-            points.push(point);
-            hints.push(hint);
+        #[cfg(feature = "parallel")]
+        {
+            points.resize(self.num_data_points, G1Affine::<P>::default());
+            hints.resize(self.num_data_points, 0);
+
+            let mut field_elements = Vec::<P::Fp>::new();
+            for i in 0..self.num_data_points {
+                field_elements.push(P::Fp::from_le_bytes_mod_order(
+                    &bytes[i * self.num_bytes_per_point..(i + 1) * self.num_bytes_per_point],
+                ));
+            }
+
+            cfg_iter!(field_elements)
+                .zip(cfg_iter_mut!(points))
+                .zip(cfg_iter_mut!(hints))
+                .for_each(|((f, p), h)| {
+                    // This would no longer use the RngCore to provide the randomness
+                    let (point, hint) = self.encoder.encode(*f, &mut rand::thread_rng());
+                    *p = point;
+                    *h = hint;
+                })
+        }
+
+        #[cfg(not(feature = "parallel"))]
+        {
+            for i in 0..self.num_data_points {
+                // convert the bytes to a field element using P::Fp::from_le_bytes_mod_order
+                let field_element = P::Fp::from_le_bytes_mod_order(
+                    &bytes[i * self.num_bytes_per_point..(i + 1) * self.num_bytes_per_point],
+                );
+                let (point, hint) = self.encoder.encode(field_element, rng);
+                points.push(point);
+                hints.push(hint);
+            }
         }
 
         let mut hints_bool: Vec<u8> = Vec::new();
@@ -152,14 +187,35 @@ impl<P: BnParameters> HybridEncoder<P> {
 
         let mut ret: Vec<u8> = Vec::new();
 
-        for (i, point) in points.iter().take(self.num_data_points).enumerate() {
-            ret.extend(
-                &self
-                    .encoder
-                    .decode_with_hints(*point, hints[i])
-                    .into_repr()
-                    .to_bytes_le()[..self.num_bytes_per_point],
-            )
+        #[cfg(feature = "parallel")]
+        {
+            let partial_ret = cfg_iter!(points)
+                .zip(cfg_iter!(hints))
+                .map(|(p, h)| {
+                    self.encoder
+                        .decode_with_hints(*p, *h)
+                        .into_repr()
+                        .to_bytes_le()[..self.num_bytes_per_point]
+                        .to_vec()
+                })
+                .collect::<Vec<_>>();
+
+            for v in partial_ret.iter() {
+                ret.extend_from_slice(v);
+            }
+        }
+
+        #[cfg(not(feature = "parallel"))]
+        {
+            for (i, point) in points.iter().take(self.num_data_points).enumerate() {
+                ret.extend(
+                    &self
+                        .encoder
+                        .decode_with_hints(*point, hints[i])
+                        .into_repr()
+                        .to_bytes_le()[..self.num_bytes_per_point],
+                )
+            }
         }
 
         ret
@@ -179,7 +235,7 @@ mod test {
         let mut rng = ark_std::test_rng();
 
         for _ in 0..REPETITIONS {
-            let encoder = HybridEncoder::<Bn446Parameters>::new();
+            let encoder = unsafe { HybridEncoder::<Bn446Parameters>::new() };
             let num_bytes = encoder.get_capacity();
 
             let mut test_bytes = vec![0u8; num_bytes];
