@@ -3,12 +3,12 @@ use ark_ec::SWModelParameters;
 use ark_ff::{Field, FpParameters, LegendreSymbol, One, PrimeField, SquareRootField, Zero};
 use ark_std::cmp::Ordering;
 use ark_std::mem::MaybeUninit;
-use ark_std::ops::{Add, Div, BitAnd};
+use ark_std::ops::{Add, BitAnd, Div};
 use ark_std::rand::RngCore;
 use ark_std::{marker::PhantomData, ops::Neg, vec::Vec, UniformRand};
 use gmp_mpfr_sys::gmp;
 use num_bigint::BigUint;
-use subtle::{ConstantTimeEq, ConditionallySelectable};
+use subtle::{ConditionallySelectable, ConstantTimeEq};
 
 pub mod hybrid;
 

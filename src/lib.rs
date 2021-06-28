@@ -7,3 +7,5 @@ pub mod elgamal_encryption;
 pub mod shacham_encryption;
 
 pub mod message_encoding;
+
+pub mod group_hashing;
