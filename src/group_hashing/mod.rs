@@ -57,18 +57,54 @@ pub struct GroupHasherDLIN<P: BnParameters, const L: usize> {
 }
 
 impl<P: BnParameters, const L: usize> GroupHasher<P, L> for GroupHasherDLIN<P, L> {
-    type PubParam = ();
-    type Hash = ();
+    type PubParam = (Vec<G2Prepared<P>>, Vec<G2Prepared<P>>);
+    type Hash = (Fp12<P::Fp12Params>, Fp12<P::Fp12Params>);
 
     fn setup<R: RngCore>(rng: &mut R) -> Self::PubParam {
-        todo!()
+        let mut pp0 = Vec::new();
+        for _ in 0..L {
+            pp0.push(G2Prepared::<P>::from(
+                G2Projective::<P>::rand(rng).into_affine(),
+            ))
+        }
+        let mut pp1 = Vec::new();
+        for _ in 0..L {
+            pp1.push(G2Prepared::<P>::from(
+                G2Projective::<P>::rand(rng).into_affine(),
+            ))
+        }
+        (pp0, pp1)
     }
 
     fn eval(pp: &Self::PubParam, m: &[G1Affine<P>]) -> Self::Hash {
-        todo!()
+        assert_eq!(m.len(), L);
+
+        let mut g_miller_loop_list = Vec::<(G1Prepared<P>, G2Prepared<P>)>::new();
+        for (a, b) in m
+            .iter()
+            .map(|x| G1Prepared::<P>::from((*x).clone()))
+            .zip(pp.0.iter())
+        {
+            g_miller_loop_list.push((a, (*b).clone()));
+        }
+        let g_miller_loop_result = Bn::<P>::miller_loop(&g_miller_loop_list);
+
+        let mut h_miller_loop_list = Vec::<(G1Prepared<P>, G2Prepared<P>)>::new();
+        for (a, b) in m
+            .iter()
+            .map(|x| G1Prepared::<P>::from((*x).clone()))
+            .zip(pp.1.iter())
+        {
+            h_miller_loop_list.push((a, (*b).clone()));
+        }
+        let h_miller_loop_result = Bn::<P>::miller_loop(&h_miller_loop_list);
+        (
+            Bn::<P>::final_exponentiation(&g_miller_loop_result).unwrap(),
+            Bn::<P>::final_exponentiation(&h_miller_loop_result).unwrap(),
+        )
     }
 
     fn check(pp: &Self::PubParam, m: &[G1Affine<P>], h: &Self::Hash) -> bool {
-        todo!()
+        Self::eval(pp, m) == *h
     }
 }
