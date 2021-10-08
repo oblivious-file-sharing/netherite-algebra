@@ -48,8 +48,15 @@ opt-level = 0
 panic = 'abort'
 
 [[bench]]
-name = "netherite-benches"
-path = "benches/bench.rs"
+name = "netherite-bench-encoding"
+path = "benches/bench_encoding.rs"
+harness = false
+test = false
+required-features = ["std"]
+
+[[bench]]
+name = "netherite-bench-pairing"
+path = "benches/bench_pairing.rs"
 harness = false
 test = false
 required-features = ["std"]

@@ -1,9 +1,12 @@
 use crate::curve_bn254::*;
+use crate::endomorphisms::glv::BnGlvParameters;
 use ark_ec::{
     bn,
     bn::{Bn, BnParameters, TwistType},
+    ModelParameters,
 };
 use ark_ff::field_new;
+
 pub mod g1;
 pub mod g2;
 
@@ -53,6 +56,17 @@ impl BnParameters for Parameters {
     type Fp12Params = Fq12Parameters;
     type G1Parameters = g1::Parameters;
     type G2Parameters = g2::Parameters;
+}
+
+impl BnGlvParameters for Parameters {
+    const BETA: <Self as BnParameters>::Fp = field_new!(
+        Fq,
+        "1807136345283977465813277102364620289631804529403213381639"
+    );
+    const LAMBDA: <Self::G1Parameters as ModelParameters>::ScalarField = field_new!(
+        Fr,
+        "3614272690567954932015376758832191878923846166742621487126"
+    );
 }
 
 pub type Bn254 = Bn<Parameters>;

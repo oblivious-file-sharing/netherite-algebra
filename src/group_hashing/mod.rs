@@ -1,24 +1,29 @@
+use crate::endomorphisms::glv::{glv_rand_gen, BnGlvParameters};
 use ark_ec::bn::{Bn, BnParameters, G1Affine, G1Prepared, G2Prepared, G2Projective};
 use ark_ec::{PairingEngine, ProjectiveCurve};
 use ark_ff::Fp12;
-use ark_std::marker::PhantomData;
-use ark_std::rand::RngCore;
-use ark_std::UniformRand;
+use ark_std::{marker::PhantomData, rand::RngCore, UniformRand};
 
-pub trait GroupHasher<P: BnParameters, const L: usize> {
+pub trait GroupHasher<P: BnParameters + BnGlvParameters, const L: usize> {
     type PubParam: Clone;
     type Hash: Clone + Eq;
 
     fn setup<R: RngCore>(rng: &mut R) -> Self::PubParam;
     fn eval(pp: &Self::PubParam, m: &[G1Affine<P>]) -> Self::Hash;
     fn check(pp: &Self::PubParam, m: &[G1Affine<P>], h: &Self::Hash) -> bool;
+    fn batch_check<R: RngCore>(
+        pp: &Self::PubParam,
+        m: &[Vec<G1Affine<P>>],
+        h: &[Self::Hash],
+        rng: &mut R,
+    ) -> bool;
 }
 
-pub struct GroupHasherXDH<P: BnParameters, const L: usize> {
+pub struct GroupHasherXDH<P: BnParameters + BnGlvParameters, const L: usize> {
     phantom: PhantomData<P>,
 }
 
-impl<P: BnParameters, const L: usize> GroupHasher<P, L> for GroupHasherXDH<P, L> {
+impl<P: BnParameters + BnGlvParameters, const L: usize> GroupHasher<P, L> for GroupHasherXDH<P, L> {
     type PubParam = Vec<G2Prepared<P>>;
     type Hash = Fp12<P::Fp12Params>;
 
@@ -50,13 +55,29 @@ impl<P: BnParameters, const L: usize> GroupHasher<P, L> for GroupHasherXDH<P, L>
     fn check(pp: &Self::PubParam, m: &[G1Affine<P>], h: &Self::Hash) -> bool {
         Self::eval(pp, m) == *h
     }
+
+    fn batch_check<R: RngCore>(
+        pp: &Self::PubParam,
+        m: &[Vec<G1Affine<P>>],
+        h: &[Self::Hash],
+        rng: &mut R,
+    ) -> bool {
+        assert!(m.len() == h.len());
+        let len = h.len();
+
+        let rands = glv_rand_gen::<P, R>(len, rng);
+
+        todo!()
+    }
 }
 
-pub struct GroupHasherDLIN<P: BnParameters, const L: usize> {
+pub struct GroupHasherDLIN<P: BnParameters + BnGlvParameters, const L: usize> {
     phantom: PhantomData<P>,
 }
 
-impl<P: BnParameters, const L: usize> GroupHasher<P, L> for GroupHasherDLIN<P, L> {
+impl<P: BnParameters + BnGlvParameters, const L: usize> GroupHasher<P, L>
+    for GroupHasherDLIN<P, L>
+{
     type PubParam = (Vec<G2Prepared<P>>, Vec<G2Prepared<P>>);
     type Hash = (Fp12<P::Fp12Params>, Fp12<P::Fp12Params>);
 
@@ -106,5 +127,14 @@ impl<P: BnParameters, const L: usize> GroupHasher<P, L> for GroupHasherDLIN<P, L
 
     fn check(pp: &Self::PubParam, m: &[G1Affine<P>], h: &Self::Hash) -> bool {
         Self::eval(pp, m) == *h
+    }
+
+    fn batch_check<R: RngCore>(
+        pp: &Self::PubParam,
+        m: &[Vec<G1Affine<P>>],
+        h: &[Self::Hash],
+        rng: &mut R,
+    ) -> bool {
+        todo!()
     }
 }
